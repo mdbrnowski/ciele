@@ -1,9 +1,7 @@
-%%%-------------------------------------------------------------------
-%% @doc ciele top level supervisor.
-%% @end
-%%%-------------------------------------------------------------------
-
 -module(ciele_sup).
+-moduledoc """
+ciele top level supervisor.
+""".
 
 -behaviour(supervisor).
 
@@ -16,22 +14,20 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
-%% sup_flags() = #{strategy => strategy(),         % optional
-%%                 intensity => non_neg_integer(), % optional
-%%                 period => pos_integer()}        % optional
-%% child_spec() = #{id => child_id(),       % mandatory
-%%                  start => mfargs(),      % mandatory
-%%                  restart => restart(),   % optional
-%%                  shutdown => shutdown(), % optional
-%%                  type => worker(),       % optional
-%%                  modules => modules()}   % optional
 init([]) ->
     SupFlags = #{
-        strategy => one_for_all,
-        intensity => 0,
-        period => 1
+        strategy => one_for_one,
+        intensity => 1,
+        period => 5
     },
-    ChildSpecs = [],
+    ChildSpecs = [
+        #{
+            id => ciele_server,
+            start => {ciele_server, start_link, []},
+            restart => permanent,
+            shutdown => 5000,
+            type => worker,
+            modules => [ciele_server]
+        }
+    ],
     {ok, {SupFlags, ChildSpecs}}.
-
-%% internal functions

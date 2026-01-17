@@ -1,9 +1,7 @@
-%%%-------------------------------------------------------------------
-%% @doc ciele public API
-%% @end
-%%%-------------------------------------------------------------------
-
 -module(ciele_app).
+-moduledoc """
+ciele public API
+""".
 
 -behaviour(application).
 
@@ -14,5 +12,3 @@ start(_StartType, _StartArgs) ->
 
 stop(_State) ->
     ok.
-
-%% internal functions

@@ -5,7 +5,9 @@
     {mod, {ciele_app, []}},
     {applications, [
         kernel,
-        stdlib
+        stdlib,
+        yamerl,
+        hackney
     ]},
     {env, []},
     {modules, []},
