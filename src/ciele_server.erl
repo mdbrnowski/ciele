@@ -20,6 +20,7 @@ start_link() ->
 init([]) ->
     {ok, _} = application:ensure_all_started(yamerl),
     {ok, _} = application:ensure_all_started(hackney),
+    logger:set_primary_config(level, notice),
     Table = ets:new(ciele_checks, [named_table, set, public, {read_concurrency, true}]),
     gen_server:cast(self(), check_sites),
     {ok, #{table => Table}}.
@@ -28,9 +29,10 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast(check_sites, State) ->
-    io:format("~nStarting site check: ~p~n", [calendar:local_time()]),
     Domains = load_domains_from_yaml(),
+    logger:notice("Loaded ~p domains to check. Starting checks...", [length(Domains)]),
     lists:foreach(fun(Domain) -> check_and_compare(Domain, State) end, Domains),
+    logger:notice("All domain checks completed. Scheduling next check in ~p s.", [(?INTERVAL) / 1000]),
     schedule_check(),
     {noreply, State};
 handle_cast(_Msg, State) ->
@@ -46,7 +48,7 @@ load_domains_from_yaml() ->
         Domains
     catch
         Error:Reason ->
-            io:format("Error loading YAML file: ~p: ~p~n", [Error, Reason]),
+            logger:error("Error loading YAML file: ~p: ~p", [Error, Reason]),
             []
     end.
 
@@ -54,14 +56,14 @@ load_domains_from_yaml() ->
 check_and_compare(Domain, State) ->
     Table = maps:get(table, State),
     Url = to_url(Domain),
-    io:format("Checking domain: ~s~n", [Url]),
+    logger:info("Checking domain: ~s", [Url]),
     case fetch_body(Url) of
         {ok, Body} ->
             maybe_log_change(Domain, Body, Table),
             ets:insert(Table, {Domain, Body}),
             ok;
         {error, Reason} ->
-            io:format("Failed to fetch ~s: ~p~n", [Url, Reason]),
+            logger:warning("Failed to fetch ~s: ~p", [Url, Reason]),
             ok
     end.
 
@@ -72,6 +74,7 @@ to_url(Domain) ->
         _ -> Domain
     end.
 
+-spec fetch_body(string()) -> {ok, binary()} | {error, any()}.
 fetch_body(Url) ->
     case hackney:request(get, Url, [], <<>>, []) of
         {ok, Status, _Headers, ClientRef} when Status >= 200, Status < 400 ->
@@ -86,18 +89,17 @@ fetch_body(Url) ->
             {error, Error}
     end.
 
+-spec maybe_log_change(string(), binary(), ets:tid()) -> ok.
 maybe_log_change(Domain, Body, Table) ->
     case ets:lookup(Table, Domain) of
         [{Domain, Body}] ->
-            io:format("No change for ~s~n", [Domain]),
-            ok;
+            logger:info("No change for ~s", [Domain]);
         [{Domain, OldBody}] ->
-            io:format("Content changed for ~s (~p -> ~p bytes)~n", [Domain, byte_size(OldBody), byte_size(Body)]),
-            ok;
+            logger:notice("Content changed for ~s (~p -> ~p bytes)", [Domain, byte_size(OldBody), byte_size(Body)]);
         [] ->
-            io:format("First check recorded for ~s (~p bytes)~n", [Domain, byte_size(Body)]),
-            ok
+            logger:notice("First check recorded for ~s (~p bytes)", [Domain, byte_size(Body)])
     end.
 
+-spec schedule_check() -> reference().
 schedule_check() ->
     erlang:send_after(?INTERVAL, self(), {'$gen_cast', check_sites}).
