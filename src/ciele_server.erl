@@ -20,7 +20,6 @@ start_link() ->
 init([]) ->
     {ok, _} = application:ensure_all_started(yamerl),
     {ok, _} = application:ensure_all_started(hackney),
-    logger:set_primary_config(level, notice),
     Table = ets:new(ciele_checks, [named_table, set, public, {read_concurrency, true}]),
     gen_server:cast(self(), check_sites),
     {ok, #{table => Table}}.
