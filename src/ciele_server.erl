@@ -27,7 +27,7 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast(check_sites, State) ->
-    Domains = ciele_config:get_domains(),
+    {ok, Domains} = ciele_config:get_domains(),
     logger:notice("Loaded ~p domains to check. Starting checks...", [length(Domains)]),
     lists:foreach(fun(Domain) -> check_and_compare(Domain, State) end, Domains),
     logger:notice("All domain checks completed. Scheduling next check in ~p s.", [

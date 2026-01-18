@@ -1,11 +1,10 @@
 -module(ciele_config).
 
--export([get_domains/0]).
+-export([get_domains/0, get_email_address/0]).
 
 -define(CONFIG_FILE, "config/config.yaml").
 
--spec get_domains() -> [string()].
-get_domains() ->
+get_config_content() ->
     case filelib:is_file(?CONFIG_FILE) of
         false ->
             logger:error("Config file ~s not found", [?CONFIG_FILE]),
@@ -13,7 +12,7 @@ get_domains() ->
         true ->
             try
                 [Doc] = yamerl_constr:file(?CONFIG_FILE),
-                handle_doc(Doc)
+                Doc
             catch
                 Class:Reason ->
                     logger:error("Failed to load config from ~s: ~p", [?CONFIG_FILE, {Class, Reason}]),
@@ -21,18 +20,30 @@ get_domains() ->
             end
     end.
 
--spec handle_doc(term()) -> [string()].
-handle_doc(Doc) when is_list(Doc) ->
+-spec get_domains() -> {ok, [string()]} | {error, any()}.
+get_domains() ->
+    Doc = get_config_content(),
     case proplists:get_value("domains", Doc, undefined) of
         undefined ->
             logger:error("No domains configured in ~s", [?CONFIG_FILE]),
-            [];
+            {error, no_domains};
         Domains when is_list(Domains) ->
-            [lists:flatten(io_lib:format("~ts", [D])) || D <- Domains];
+            {ok, [lists:flatten(io_lib:format("~ts", [D])) || D <- Domains]};
         _Other ->
             logger:error("Domains entry in ~s is not a list", [?CONFIG_FILE]),
-            []
-    end;
-handle_doc(_Doc) ->
-    logger:error("Config content in ~s is not a proplist", [?CONFIG_FILE]),
-    [].
+            {error, invalid_domains}
+    end.
+
+-spec get_email_address() -> {ok, string()} | {error, any()}.
+get_email_address() ->
+    Doc = get_config_content(),
+    case proplists:get_value("email_address", Doc, undefined) of
+        undefined ->
+            logger:error("No email_address configured in ~s", [?CONFIG_FILE]),
+            {error, no_email_address};
+        Email when is_list(Email) ->
+            {ok, lists:flatten(io_lib:format("~ts", [Email]))};
+        _Other ->
+            logger:error("email_address entry in ~s is not a string", [?CONFIG_FILE]),
+            {error, invalid_email_address}
+    end.

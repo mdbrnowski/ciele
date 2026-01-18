@@ -32,4 +32,5 @@ temp_files() ->
 -spec send_email(string(), string()) -> ok.
 send_email(_Diff, _Domain) ->
     % todo: implement email sending
+    {ok, _EmailAddress} = ciele_config:get_email_address(),
     ok.
