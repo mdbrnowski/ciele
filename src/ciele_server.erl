@@ -31,7 +31,9 @@ handle_cast(check_sites, State) ->
     Domains = load_domains_from_yaml(),
     logger:notice("Loaded ~p domains to check. Starting checks...", [length(Domains)]),
     lists:foreach(fun(Domain) -> check_and_compare(Domain, State) end, Domains),
-    logger:notice("All domain checks completed. Scheduling next check in ~p s.", [(?INTERVAL) / 1000]),
+    logger:notice("All domain checks completed. Scheduling next check in ~p s.", [
+        (?INTERVAL) / 1000
+    ]),
     schedule_check(),
     {noreply, State};
 handle_cast(_Msg, State) ->
@@ -94,7 +96,10 @@ maybe_log_change(Domain, Body, Table) ->
         [{Domain, Body}] ->
             logger:info("No change for ~s", [Domain]);
         [{Domain, OldBody}] ->
-            logger:notice("Content changed for ~s (~p -> ~p bytes)", [Domain, byte_size(OldBody), byte_size(Body)]);
+            logger:notice("Content changed for ~s (~p -> ~p bytes)", [
+                Domain, byte_size(OldBody), byte_size(Body)
+            ]),
+            ciele_diff:handle_diff(OldBody, Body, Domain);
         [] ->
             logger:notice("First check recorded for ~s (~p bytes)", [Domain, byte_size(Body)])
     end.
