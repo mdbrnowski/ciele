@@ -1,6 +1,6 @@
 -module(ciele_config).
 
--export([get_domains/0, get_email_address/0]).
+-export([get_domains/0, get_email_address/0, get_sender_email_address/0]).
 
 -define(CONFIG_FILE, "config/config.yaml").
 
@@ -46,4 +46,18 @@ get_email_address() ->
         _Other ->
             logger:error("email_address entry in ~s is not a string", [?CONFIG_FILE]),
             {error, invalid_email_address}
+    end.
+
+-spec get_sender_email_address() -> {ok, string()} | {error, any()}.
+get_sender_email_address() ->
+    Doc = get_config_content(),
+    case proplists:get_value("sender_email_address", Doc, undefined) of
+        undefined ->
+            logger:error("No sender_email_address configured in ~s", [?CONFIG_FILE]),
+            {error, no_sender_email_address};
+        Email when is_list(Email) ->
+            {ok, lists:flatten(io_lib:format("~ts", [Email]))};
+        _Other ->
+            logger:error("sender_email_address entry in ~s is not a string", [?CONFIG_FILE]),
+            {error, invalid_sender_email_address}
     end.
