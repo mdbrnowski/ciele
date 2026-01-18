@@ -1,4 +1,4 @@
-config/sites.yaml
+config/config.yaml
 
 .rebar3
 _build

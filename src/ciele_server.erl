@@ -7,8 +7,7 @@
 %% Callbacks
 -export([init/1, handle_call/3, handle_cast/2]).
 
--define(INTERVAL, 1000 * 60 * 60 * 24). % 24 hours
--define(SITES_FILE, "config/sites.yaml").
+-define(INTERVAL, 1000 * 60 * 60 * 6). % 6 hours
 
 %% API
 
@@ -28,7 +27,7 @@ handle_call(_Request, _From, State) ->
     {reply, ok, State}.
 
 handle_cast(check_sites, State) ->
-    Domains = load_domains_from_yaml(),
+    Domains = ciele_config:get_domains(),
     logger:notice("Loaded ~p domains to check. Starting checks...", [length(Domains)]),
     lists:foreach(fun(Domain) -> check_and_compare(Domain, State) end, Domains),
     logger:notice("All domain checks completed. Scheduling next check in ~p s.", [
@@ -40,18 +39,6 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 %% Internal functions
-
--spec load_domains_from_yaml() -> [string()].
-load_domains_from_yaml() ->
-    try
-        [Document] = yamerl_constr:file(?SITES_FILE),
-        [{"domains", Domains}] = Document,
-        Domains
-    catch
-        Error:Reason ->
-            logger:error("Error loading YAML file: ~p: ~p", [Error, Reason]),
-            []
-    end.
 
 -spec check_and_compare(string(), map()) -> ok.
 check_and_compare(Domain, State) ->
