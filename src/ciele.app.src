@@ -6,8 +6,9 @@
     {applications, [
         kernel,
         stdlib,
-        yamerl,
-        hackney
+        hackney,
+        jiffy,
+        yamerl
     ]},
     {env, []},
     {modules, []},

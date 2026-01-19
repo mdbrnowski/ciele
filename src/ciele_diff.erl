@@ -35,10 +35,11 @@ send_email(Diff, Domain) ->
         false ->
             logger:error("RESEND_API_KEY not set, skipping email for ~s", [Domain]);
         ApiKey ->
+            ApiKeyBin = to_binary(ApiKey),
             Payload = build_payload(Diff, Domain),
             Headers = [
-                {"Authorization", "Bearer " ++ ApiKey},
-                {"Content-Type", "application/json"}
+                {<<"Authorization">>, <<"Bearer ", ApiKeyBin/binary>>},
+                {<<"Content-Type">>, <<"application/json">>}
             ],
             Url = "https://api.resend.com/emails",
             Body = jiffy:encode(Payload),
