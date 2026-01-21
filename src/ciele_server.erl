@@ -35,6 +35,12 @@ handle_call(_Request, _From, State) ->
 
 handle_cast(check_sites, State) ->
     {ok, Domains} = ciele_config:get_domains(),
+    Table = maps:get(table, State),
+    OldDomains = [D || {D, _} <- ets:tab2list(Table)],
+    lists:foreach(fun(D) ->
+        logger:notice("Domain removed from config: ~s", [D]),
+        ets:delete(Table, D)
+    end, OldDomains -- Domains),
     logger:notice("Loaded ~p domains to check. Starting checks...", [length(Domains)]),
     lists:foreach(fun(Domain) -> check_and_compare(Domain, State) end, Domains),
     logger:notice("All domain checks completed. Scheduling next check in ~p s.", [
