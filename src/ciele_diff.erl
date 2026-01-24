@@ -59,7 +59,9 @@ send_email(Diff, Domain) ->
 
 -spec build_payload(string(), string()) -> map().
 build_payload(Diff, Domain) ->
-    Subject = iolist_to_binary(io_lib:format("Ciele: change detected for ~s", [Domain])),
+    Subject = iolist_to_binary(
+        io_lib:format("Ciele: change detected for ~s", [remove_https(Domain)])
+    ),
     HtmlBody = build_html(Diff, Domain),
     {ok, EmailAddress} = ciele_config:get_email_address(),
     {ok, SenderEmailAddress} = ciele_config:get_sender_email_address(),
@@ -70,6 +72,11 @@ build_payload(Diff, Domain) ->
         <<"html">> => HtmlBody,
         <<"reply_to">> => to_binary(SenderEmailAddress)
     }.
+
+-spec remove_https(string()) -> string().
+remove_https("https://" ++ Rest) -> Rest;
+remove_https("http://" ++ Rest) -> Rest;
+remove_https(Url) -> Url.
 
 -spec build_html(string(), string()) -> binary().
 build_html(Diff, Domain) ->
