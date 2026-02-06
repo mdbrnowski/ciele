@@ -32,4 +32,10 @@ mkdir -p pipes logs
 run_erl -daemon ./pipes/ ./logs "rebar3 shell"
 ```
 
+You can then attach it with `to_erl ./pipes/` and run the check manually using
+
+```erlang
+gen_server:cast(ciele_server, check_sites).
+```
+
 <img src="assets/ciele.png" width="300">
