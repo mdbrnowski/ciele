@@ -27,8 +27,9 @@ init([]) ->
             ok
     end,
     Table = ets:new(ciele_checks, [named_table, set, public, {read_concurrency, true}]),
+    Errors = ets:new(ciele_errors, [named_table, set, public]),
     gen_server:cast(self(), check_sites),
-    {ok, #{table => Table}}.
+    {ok, #{table => Table, errors => Errors}}.
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
@@ -56,15 +57,33 @@ handle_cast(_Msg, State) ->
 -spec check_and_compare(string(), map()) -> ok.
 check_and_compare(Domain, State) ->
     Table = maps:get(table, State),
+    Errors = maps:get(errors, State),
     Url = to_url(Domain),
     logger:info("Checking domain: ~s", [Url]),
     case fetch_body(Url) of
         {ok, Body} ->
+            ets:delete(Errors, Domain),
             maybe_log_change(Domain, Body, Table),
             ets:insert(Table, {Domain, Body}),
             ok;
+        {error, {unexpected_status, 404}} ->
+            handle_404(Domain, Errors);
         {error, Reason} ->
             logger:warning("Failed to fetch ~s: ~p", [Url, Reason]),
+            ok
+    end.
+
+-spec handle_404(string(), ets:tid()) -> ok.
+handle_404(Domain, Errors) ->
+    Count = ets:update_counter(Errors, Domain, 1, {Domain, 0}),
+    case Count of
+        2 ->
+            logger:notice("Two consecutive 404 errors for ~s", [Domain]),
+            ciele_diff:handle_diff(<<"[Previous content]\n">>, <<"404 Not Found\n">>, Domain);
+        1 ->
+            logger:notice("First 404 for ~s", [Domain]);
+        _ ->
+            logger:notice("Subsequent 404 (~p) for ~s", [Count, Domain]),
             ok
     end.
 
