@@ -2,10 +2,10 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0, reload/0]).
 
 %% Callbacks
--export([init/1, handle_call/3, handle_cast/2]).
+-export([init/1, handle_call/3, handle_cast/2, code_change/3]).
 
 -define(INTERVAL, 1000 * 60 * 60 * 6). % 6 hours
 
@@ -51,6 +51,25 @@ handle_cast(check_sites, State) ->
     {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%% API functions
+
+-spec reload() -> ok.
+reload() ->
+    Modules = [ciele_app, ciele_sup, ciele_server, ciele_config, ciele_diff],
+    lists:foreach(fun(M) ->
+        code:purge(M),
+        case code:load_file(M) of
+            {module, M} ->
+                logger:notice("Reloaded module: ~p", [M]);
+            {error, Reason} ->
+                logger:error("Failed to reload ~p: ~p", [M, Reason])
+        end
+    end, Modules),
+    ok.
 
 %% Internal functions
 
