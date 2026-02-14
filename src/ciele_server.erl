@@ -59,12 +59,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 -spec reload() -> ok.
 reload() ->
-    Modules = [ciele_app, ciele_sup, ciele_server, ciele_config, ciele_diff],
+    {ok, Modules} = application:get_key(ciele, modules),
     lists:foreach(fun(M) ->
         code:purge(M),
         case code:load_file(M) of
             {module, M} ->
-                logger:notice("Reloaded module: ~p", [M]);
+                logger:info("Reloaded module: ~p", [M]);
             {error, Reason} ->
                 logger:error("Failed to reload ~p: ~p", [M, Reason])
         end

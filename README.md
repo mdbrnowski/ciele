@@ -44,7 +44,7 @@ To update the application without stopping it (after recompiling the code with `
 ciele_server:reload().
 ```
 
-This will reload all application modules in place, allowing you to apply code changes without restarting the server or losing state.
+This will reload all application modules in place, allowing you to apply code changes without restarting the server or losing state. New modules are automatically discovered.
 
 <img src="assets/ciele.png" width="300">
 
