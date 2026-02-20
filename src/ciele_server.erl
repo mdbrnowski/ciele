@@ -1,6 +1,8 @@
 -module(ciele_server).
 -behaviour(gen_server).
 
+-ignore_xref([start_link/0, reload/0]).
+
 %% API
 -export([start_link/0, reload/0]).
 
