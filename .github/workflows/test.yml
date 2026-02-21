@@ -24,3 +24,4 @@ jobs:
         rebar3-version: ${{matrix.rebar3}}
     - run: rebar3 compile
     - run: rebar3 xref
+    - run: rebar3 eunit
