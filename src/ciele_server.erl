@@ -9,6 +9,10 @@
 %% Callbacks
 -export([init/1, handle_call/3, handle_cast/2, code_change/3]).
 
+-ifdef(TEST).
+-export([to_url/1, fetch_body/1]).
+-endif.
+
 -define(INTERVAL, 1000 * 60 * 60 * 6). % 6 hours
 
 %% API

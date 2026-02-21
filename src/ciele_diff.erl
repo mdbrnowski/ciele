@@ -2,6 +2,10 @@
 
 -export([handle_diff/3]).
 
+-ifdef(TEST).
+-export([remove_https/1, escape_html/1, to_binary/1, build_html/2, temp_files/0]).
+-endif.
+
 -spec handle_diff(binary(), binary(), string()) -> ok.
 handle_diff(OldBin, NewBin, Domain) ->
     {OldPath, NewPath} = temp_files(),
