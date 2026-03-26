@@ -96,3 +96,23 @@ temp_files_contain_ciele_prefix_test() ->
     {Old, New} = ciele_diff:temp_files(),
     ?assertNotEqual(nomatch, string:find(Old, "ciele_old_")),
     ?assertNotEqual(nomatch, string:find(New, "ciele_new_")).
+
+%%--------------------------------------------------------------------
+%% body_content/1
+%%--------------------------------------------------------------------
+
+body_content_extracts_body_test() ->
+    Html = <<"<html><head><title>x</title></head><body><p>hello</p></body></html>">>,
+    ?assertEqual(<<"<p>hello</p>">>, ciele_diff:body_content(Html)).
+
+body_content_extracts_body_case_insensitive_test() ->
+    Html = <<"<HTML><BODY>hello</BODY></HTML>">>,
+    ?assertEqual(<<"hello">>, ciele_diff:body_content(Html)).
+
+body_content_extracts_body_with_attributes_test() ->
+    Html = <<"<html><body class=\"main\" id=\"x\">hello</body></html>">>,
+    ?assertEqual(<<"hello">>, ciele_diff:body_content(Html)).
+
+body_content_falls_back_when_no_body_test() ->
+    Input = <<"plain text">>,
+    ?assertEqual(Input, ciele_diff:body_content(Input)).
