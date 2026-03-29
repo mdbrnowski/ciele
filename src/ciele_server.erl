@@ -10,7 +10,7 @@
 -export([init/1, handle_call/3, handle_cast/2, code_change/3]).
 
 -ifdef(TEST).
--export([to_url/1, fetch_body/1]).
+-export([to_url/1, fetch_body/1, comparable_content/1]).
 -endif.
 
 -define(INTERVAL, 1000 * 60 * 60 * 6). % 6 hours
@@ -44,10 +44,13 @@ handle_cast(check_sites, State) ->
     {ok, Domains} = ciele_config:get_domains(),
     Table = maps:get(table, State),
     OldDomains = [D || {D, _} <- ets:tab2list(Table)],
-    lists:foreach(fun(D) ->
-        logger:notice("Domain removed from config: ~s", [D]),
-        ets:delete(Table, D)
-    end, OldDomains -- Domains),
+    lists:foreach(
+        fun(D) ->
+            logger:notice("Domain removed from config: ~s", [D]),
+            ets:delete(Table, D)
+        end,
+        OldDomains -- Domains
+    ),
     logger:notice("Loaded ~p domains to check. Starting checks...", [length(Domains)]),
     lists:foreach(fun(Domain) -> check_and_compare(Domain, State) end, Domains),
     logger:notice("All domain checks completed. Scheduling next check in ~p s.", [
@@ -66,15 +69,18 @@ code_change(_OldVsn, State, _Extra) ->
 -spec reload() -> ok.
 reload() ->
     {ok, Modules} = application:get_key(ciele, modules),
-    lists:foreach(fun(M) ->
-        code:purge(M),
-        case code:load_file(M) of
-            {module, M} ->
-                logger:info("Reloaded module: ~p", [M]);
-            {error, Reason} ->
-                logger:error("Failed to reload ~p: ~p", [M, Reason])
-        end
-    end, Modules),
+    lists:foreach(
+        fun(M) ->
+            code:purge(M),
+            case code:load_file(M) of
+                {module, M} ->
+                    logger:info("Reloaded module: ~p", [M]);
+                {error, Reason} ->
+                    logger:error("Failed to reload ~p: ~p", [M, Reason])
+            end
+        end,
+        Modules
+    ),
     ok.
 
 %% Internal functions
@@ -87,9 +93,10 @@ check_and_compare(Domain, State) ->
     logger:info("Checking domain: ~s", [Url]),
     case fetch_body(Url) of
         {ok, Body} ->
+            Comparable = comparable_content(Body),
             ets:delete(Errors, Domain),
-            maybe_log_change(Domain, Body, Table),
-            ets:insert(Table, {Domain, Body}),
+            maybe_log_change(Domain, Comparable, Table),
+            ets:insert(Table, {Domain, Comparable}),
             ok;
         {error, {unexpected_status, 404}} ->
             handle_404(Domain, Errors);
@@ -132,6 +139,13 @@ fetch_body(Url) ->
             {error, {unexpected_status, Status}};
         Error ->
             {error, Error}
+    end.
+
+-spec comparable_content(binary()) -> binary().
+comparable_content(Content) when is_binary(Content) ->
+    case re:run(Content, <<"(?is)<body\\b[^>]*>(.*?)</body>">>, [{capture, [1], binary}]) of
+        {match, [Body]} -> Body;
+        nomatch -> Content
     end.
 
 -spec maybe_log_change(string(), binary(), ets:tid()) -> ok.

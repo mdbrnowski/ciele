@@ -8,19 +8,16 @@
     escape_html/1,
     to_binary/1,
     build_html/2,
-    temp_files/0,
-    body_content/1
+    temp_files/0
 ]).
 -endif.
 
 -spec handle_diff(binary(), binary(), string()) -> ok.
 handle_diff(OldBin, NewBin, Domain) ->
     {OldPath, NewPath} = temp_files(),
-    OldBody = body_content(OldBin),
-    NewBody = body_content(NewBin),
     try
-        ok = file:write_file(OldPath, OldBody),
-        ok = file:write_file(NewPath, NewBody),
+        ok = file:write_file(OldPath, OldBin),
+        ok = file:write_file(NewPath, NewBin),
         Cmd = io_lib:format("diff -u --label old --label new ~s ~s", [OldPath, NewPath]),
         Diff = os:cmd(lists:flatten(Cmd)),
         logger:info("Diff for ~s:~n~ts", [Domain, Diff]),
@@ -96,7 +93,8 @@ build_html(Diff, Domain) ->
     DiffEscaped = escape_html(to_binary(Diff)),
     DomainEscaped = escape_html(to_binary(Domain)),
     iolist_to_binary([
-        <<"<p>Change detected for ">>, DomainEscaped,
+        <<"<p>Change detected for ">>,
+        DomainEscaped,
         <<"</p><pre style=\"white-space:pre-wrap\">">>,
         DiffEscaped,
         <<"</pre>">>
@@ -108,13 +106,6 @@ to_binary(Data) ->
         Bin when is_binary(Bin) -> Bin;
         {error, _, _} -> iolist_to_binary(io_lib:format("~ts", [Data]));
         {incomplete, _, _} -> iolist_to_binary(io_lib:format("~ts", [Data]))
-    end.
-
--spec body_content(binary()) -> binary().
-body_content(Bin) when is_binary(Bin) ->
-    case re:run(Bin, <<"(?is)<body\\b[^>]*>(.*?)</body>">>, [{capture, [1], binary}]) of
-        {match, [Body]} -> Body;
-        nomatch -> Bin
     end.
 
 -spec escape_html(binary()) -> binary().
