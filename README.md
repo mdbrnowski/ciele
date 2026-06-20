@@ -7,22 +7,23 @@ Written in [Gleam](https://gleam.run), running on the Erlang/OTP runtime.
 ## Configuration
 
 To use the app, you need to set the `RESEND_API_KEY` environment variable. You can obtain the API key from [resend.com](https://resend.com).
-In addition, you need to create a configuration file at `config/config.yaml` (see [`config/config.example.yaml`](config/config.example.yaml)):
+In addition, you need to create a configuration file at `config/config.toml` (see [`config/config.example.toml`](config/config.example.toml)):
 
-```yaml
-email_address: yourmail@gmail.com
-sender_email_address: ciele@yourdomain.com
-domains:
-  - www.gleam.run
-  - www.erlang.org
+```toml
+email_address = "yourmail@gmail.com"
+sender_email_address = "ciele@yourdomain.com"
+domains = [
+  "www.gleam.run",
+  "www.erlang.org",
+]
 ```
 
 ### Dry-run mode
 
-Set `dry_run: true` in the config file to try the app without sending real emails. In this mode `RESEND_API_KEY` is not required, and instead of sending emails the app logs to the console the messages it would have sent.
+Set `dry_run = true` in the config file to try the app without sending real emails. In this mode `RESEND_API_KEY` is not required, and instead of sending emails the app logs to the console the messages it would have sent.
 
-```yaml
-dry_run: true
+```toml
+dry_run = true
 ```
 
 ## Running the app
