@@ -4,6 +4,7 @@
 
 import ciele/config.{type Config}
 import ciele/diff
+import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
 import gleam/http/request
@@ -204,16 +205,29 @@ fn fetch_body(url: String) -> Result(String, FetchError) {
   case request.to(url) {
     Error(_) -> Error(BadUrl)
     Ok(request) ->
-      case httpc.send(request) {
+      case httpc.send_bits(request.set_body(request, <<>>)) {
         Ok(response) ->
           case response.status >= 200 && response.status < 400 {
-            True -> Ok(response.body)
+            True -> Ok(decode_body(response.body))
             False -> Error(UnexpectedStatus(response.status))
           }
         Error(error) -> Error(RequestFailed(error))
       }
   }
 }
+
+/// Decode a response body into a string. Valid UTF-8 is kept as-is; pages with
+/// the odd corrupt byte are decoded leniently, replacing only the invalid bytes
+/// with `?` so the rest of the (readable) content survives into the diff email.
+pub fn decode_body(body: BitArray) -> String {
+  case bit_array.to_string(body) {
+    Ok(text) -> text
+    Error(_) -> lossy_utf8(body)
+  }
+}
+
+@external(erlang, "encoding_ffi", "lossy_utf8")
+fn lossy_utf8(body: BitArray) -> String
 
 /// Extract the contents of the `<body>` element, falling back to the whole
 /// document when there is no body. This is the part of a page worth comparing.
