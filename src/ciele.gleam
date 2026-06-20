@@ -24,7 +24,7 @@ pub fn main() -> Nil {
   case config.dry_run, envoy.get("RESEND_API_KEY") {
     True, _ ->
       logging.log(
-        logging.Notice,
+        logging.Warning,
         "Dry-run mode is enabled: emails will be logged to the console instead of being sent.",
       )
     False, Ok(_) -> Nil
