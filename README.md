@@ -2,17 +2,27 @@
 
 An application that monitors selected static websites and notifies you of any changes on them.
 
+Written in [Gleam](https://gleam.run), running on the Erlang/OTP runtime.
+
 ## Configuration
 
 To use the app, you need to set the `RESEND_API_KEY` environment variable. You can obtain the API key from [resend.com](https://resend.com).
-In addition, you need to create a configuration file at `config/config.yaml`:
+In addition, you need to create a configuration file at `config/config.yaml` (see [`config/config.example.yaml`](config/config.example.yaml)):
 
 ```yaml
 email_address: yourmail@gmail.com
 sender_email_address: ciele@yourdomain.com
 domains:
+  - www.gleam.run
   - www.erlang.org
-  - www.rabbitmq.com
+```
+
+### Dry-run mode
+
+Set `dry_run: true` in the config file to try the app without sending real emails. In this mode `RESEND_API_KEY` is not required, and instead of sending emails the app logs to the console the messages it would have sent.
+
+```yaml
+dry_run: true
 ```
 
 ## Running the app
@@ -20,32 +30,17 @@ domains:
 To run the app, use
 
 ```bash
-rebar3 shell
+gleam run
 ```
 
-To run it in the background, you can use `run_erl`:
+The server checks every configured domain on startup and then every six hours. When a page's `<body>` changes, a unified diff is emailed to you. To run it in the background you can use any process supervisor you like (for example `systemd`, `tmux`, or `nohup gleam run &`).
+
+## Development
 
 ```bash
-mkdir -p pipes logs
-run_erl -daemon ./pipes/ ./logs "rebar3 shell"
+gleam test    # run the test suite
+gleam format  # format the code
+gleam build   # type-check and compile
 ```
-
-You can then attach it with `to_erl ./pipes/` and run the check manually using
-
-```erlang
-gen_server:cast(ciele_server, check_sites).
-```
-
-## Hot reloading
-
-To update the application without stopping it (after recompiling the code with `rebar3 compile`):
-
-```erlang
-ciele_server:reload().
-```
-
-This will reload all application modules in place, allowing you to apply code changes without restarting the server or losing state. New modules are automatically discovered.
-
-<img src="assets/ciele.png" width="300">
 
 The name of this app comes from a Polish idiom: *[patrzeć jak cielę na malowane wrota](https://pl.wiktionary.org/wiki/patrze%C4%87_jak_ciel%C4%99_na_malowane_wrota)*.
