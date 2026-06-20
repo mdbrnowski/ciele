@@ -4,6 +4,7 @@
 
 import ciele/config.{type Config}
 import ciele/diff
+import ciele/url
 import gleam/bit_array
 import gleam/dict.{type Dict}
 import gleam/erlang/process.{type Subject}
@@ -105,7 +106,7 @@ fn check_sites(state: State) -> State {
 }
 
 fn check_and_compare(domain: String, state: State, config: Config) -> State {
-  let url = to_url(domain)
+  let url = url.with_scheme(domain)
   logging.log(logging.Info, "Checking domain: " <> url)
 
   case fetch_body(url) {
@@ -187,14 +188,6 @@ fn maybe_log_change(
           <> int.to_string(string.byte_size(body))
           <> " bytes)",
       )
-  }
-}
-
-/// Prefix `domain` with `https://` unless it already carries a scheme.
-pub fn to_url(domain: String) -> String {
-  case domain {
-    "http://" <> _ | "https://" <> _ -> domain
-    _ -> "https://" <> domain
   }
 }
 

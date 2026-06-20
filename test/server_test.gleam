@@ -1,23 +1,5 @@
 import ciele/server
 
-// to_url/1
-
-pub fn to_url_adds_https_test() {
-  assert server.to_url("example.com") == "https://example.com"
-}
-
-pub fn to_url_keeps_https_test() {
-  assert server.to_url("https://example.com") == "https://example.com"
-}
-
-pub fn to_url_keeps_http_test() {
-  assert server.to_url("http://example.com") == "http://example.com"
-}
-
-pub fn to_url_with_path_test() {
-  assert server.to_url("example.com/path") == "https://example.com/path"
-}
-
 // comparable_content/1
 
 pub fn comparable_content_extracts_body_test() {

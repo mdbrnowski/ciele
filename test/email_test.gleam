@@ -1,20 +1,6 @@
 import ciele/email
 import gleam/string
 
-// remove_https/1
-
-pub fn remove_https_strips_https_test() {
-  assert email.remove_https("https://example.com") == "example.com"
-}
-
-pub fn remove_https_strips_http_test() {
-  assert email.remove_https("http://example.com") == "example.com"
-}
-
-pub fn remove_https_leaves_plain_domain_test() {
-  assert email.remove_https("example.com") == "example.com"
-}
-
 // escape_html/1
 
 pub fn escape_html_ampersand_test() {

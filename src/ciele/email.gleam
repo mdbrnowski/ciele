@@ -1,6 +1,7 @@
 //// Building and sending change-notification emails through the Resend API.
 
 import ciele/config.{type Config}
+import ciele/url
 import envoy
 import gleam/http
 import gleam/http/request
@@ -44,7 +45,7 @@ fn log_email(diff: String, domain: String, config: Config) -> Nil {
       <> config.email_address
       <> "\n"
       <> "Subject: Ciele: change detected for "
-      <> remove_https(domain)
+      <> url.without_scheme(domain)
       <> "\n\n"
       <> build_html(diff, domain),
   )
@@ -106,7 +107,7 @@ pub fn build_payload(
     #("to", json.array([config.email_address], json.string)),
     #(
       "subject",
-      json.string("Ciele: change detected for " <> remove_https(domain)),
+      json.string("Ciele: change detected for " <> url.without_scheme(domain)),
     ),
     #("html", json.string(build_html(diff, domain))),
     #("reply_to", json.string(config.sender_email_address)),
@@ -120,15 +121,6 @@ pub fn build_html(diff: String, domain: String) -> String {
   <> "</p><pre style=\"white-space:pre-wrap\">"
   <> escape_html(diff)
   <> "</pre>"
-}
-
-/// Strip a leading `http://` or `https://` scheme from `url`.
-pub fn remove_https(url: String) -> String {
-  case url {
-    "https://" <> rest -> rest
-    "http://" <> rest -> rest
-    _ -> url
-  }
 }
 
 /// Escape the characters that are significant in HTML text content.
