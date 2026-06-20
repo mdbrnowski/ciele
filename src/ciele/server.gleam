@@ -64,7 +64,14 @@ fn handle_message(
 
 fn check_sites(state: State) -> State {
   case config.load() {
-    Error(error) -> panic as config.describe_error(error)
+    Error(error) -> {
+      logging.log(
+        logging.Error,
+        "Could not reload config, keeping previous domains: "
+          <> config.describe_error(error),
+      )
+      state
+    }
     Ok(config) -> {
       let removed =
         dict.keys(state.checks)
