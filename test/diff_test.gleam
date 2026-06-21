@@ -1,21 +1,16 @@
-import ciele/config
 import ciele/diff
 import gleam/string
 
-// handle_diff/4 (dry run)
+// compute/2
 
-pub fn handle_diff_dry_run_test() {
-  let config =
-    config.Config(
-      email_address: "to@example.com",
-      sender_email_address: "ciele@example.com",
-      domains: [],
-      dry_run: True,
-    )
+pub fn compute_reports_changed_lines_test() {
+  let diff = diff.compute("eorðe\n", "earth\n")
+  assert string.contains(diff, "-eorðe")
+  assert string.contains(diff, "+earth")
+}
 
-  // In dry-run mode the whole pipeline (temp files, `diff`, console logging)
-  // runs without needing an API key or making any network call.
-  assert diff.handle_diff("old\n", "new\n", "example.com", config) == Nil
+pub fn compute_no_change_is_empty_test() {
+  assert diff.compute("the\nsame\n", "the\nsame\n") == ""
 }
 
 // temp_files/0
