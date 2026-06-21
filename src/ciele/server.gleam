@@ -244,7 +244,7 @@ fn handle_response(status: Int, body: BitArray) -> Result(String, FetchError) {
   }
 }
 
-@external(erlang, "encoding_ffi", "fetch_tls12")
+@external(erlang, "ciele_ffi", "fetch_tls12")
 fn fetch_tls12(url: String, user_agent: String) -> Result(#(Int, BitArray), Nil)
 
 /// Decode a response body into a string. Valid UTF-8 is kept as-is; pages with
@@ -257,7 +257,7 @@ pub fn decode_body(body: BitArray) -> String {
   }
 }
 
-@external(erlang, "encoding_ffi", "lossy_utf8")
+@external(erlang, "ciele_ffi", "lossy_utf8")
 fn lossy_utf8(body: BitArray) -> String
 
 /// Extract the contents of the `<body>` element, falling back to the whole

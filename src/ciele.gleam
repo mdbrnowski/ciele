@@ -11,6 +11,7 @@ import logging
 
 pub fn main() -> Nil {
   logging.configure()
+  configure_log_timestamps()
   logging.set_level(logging.Notice)
 
   // An unparseable or incomplete config is fatal.
@@ -34,6 +35,10 @@ pub fn main() -> Nil {
   let assert Ok(_) = start_supervisor()
   process.sleep_forever()
 }
+
+/// Prefix every log line with a timestamp.
+@external(erlang, "ciele_ffi", "configure_timestamps")
+fn configure_log_timestamps() -> Nil
 
 fn start_supervisor() {
   supervisor.new(supervisor.OneForOne)
