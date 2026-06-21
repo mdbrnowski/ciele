@@ -1,5 +1,5 @@
--module(encoding_ffi).
--export([lossy_utf8/1, fetch_tls12/2]).
+-module(ciele_ffi).
+-export([lossy_utf8/1, fetch_tls12/2, configure_timestamps/0, format/2]).
 
 %% Fetch `Url' over HTTPS forcing a TLS 1.2 handshake.
 fetch_tls12(Url, UserAgent) ->
@@ -37,3 +37,28 @@ lossy_utf8(Bin, Acc) ->
         {incomplete, Valid, _Rest} ->
             <<Acc/binary, Valid/binary, 16#EF, 16#BF, 16#BD>>
     end.
+
+%% Reconfigure the default logger handler so every line is prefixed with a
+%% local-time timestamp. Must be called after logging:configure/0.
+configure_timestamps() ->
+    case logger:get_handler_config(default) of
+        {ok, #{formatter := {_Module, FormatterConfig}}} ->
+            logger:update_handler_config(default, #{
+                formatter => {ciele_ffi, FormatterConfig}
+            });
+        _ ->
+            ok
+    end,
+    nil.
+
+%% Logger formatter callback: prepend a timestamp in the system's local
+%% timezone, then defer to logging_ffi for the level + message rendering.
+format(#{meta := Meta} = Event, Config) ->
+    Time = maps:get(time, Meta, erlang:system_time(microsecond)),
+    Universal = calendar:system_time_to_universal_time(Time, microsecond),
+    {{Y, Mo, D}, {H, Mi, S}} = calendar:universal_time_to_local_time(Universal),
+    Timestamp = io_lib:format(
+        "~4..0b-~2..0b-~2..0b ~2..0b:~2..0b:~2..0b",
+        [Y, Mo, D, H, Mi, S]
+    ),
+    [Timestamp, $\s, logging_ffi:format(Event, Config)].
