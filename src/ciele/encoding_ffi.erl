@@ -12,13 +12,13 @@ fetch_tls12(Url, UserAgent) ->
                 [{match_fun,
                   public_key:pkix_verify_hostname_match_fun(https)}]}],
     HttpOpts = [{ssl, SslOpts}, {timeout, 30000}, {autoredirect, false}],
-    Opts = [{body_format, binary}, {socket_opts, [{ipfamily, inet}]}],
+    Opts = [{body_format, binary}, {socket_opts, [{ipfamily, inet6fb4}]}],
     Headers = [{"user-agent", binary_to_list(UserAgent)}],
     case httpc:request(get, {binary_to_list(Url), Headers}, HttpOpts, Opts) of
         {ok, {{_Version, Status, _Reason}, _Headers, Body}} ->
             {ok, {Status, Body}};
-        {error, Reason} ->
-            {error, list_to_binary(io_lib:format("~p", [Reason]))}
+        {error, _Reason} ->
+            {error, nil}
     end.
 
 %% Decode `Bin' as UTF-8, keeping every valid sequence intact and replacing each

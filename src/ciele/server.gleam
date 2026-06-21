@@ -216,9 +216,9 @@ fn fetch_body(url: String) -> Result(String, FetchError) {
         |> httpc.send_bits
       {
         Ok(response) -> handle_response(response.status, response.body)
-        // Some hosts sit behind a middlebox that drops Erlang's default
-        // TLS 1.3 handshake, surfacing as `FailedToConnect(_, Posix("closed"))`.
-        // Retry once forcing TLS 1.2; keep the original error if that fails too.
+        // Some hosts sit behind a middlebox that drops Erlang's default TLS 1.3
+        // handshake, surfacing as `FailedToConnect(_, Posix("closed"))`. Retry
+        // once forcing TLS 1.2; keep the original error if that fails too.
         Error(error) ->
           case fetch_tls12(url, browser_user_agent) {
             Ok(#(status, body)) -> handle_response(status, body)
@@ -236,10 +236,7 @@ fn handle_response(status: Int, body: BitArray) -> Result(String, FetchError) {
 }
 
 @external(erlang, "encoding_ffi", "fetch_tls12")
-fn fetch_tls12(
-  url: String,
-  user_agent: String,
-) -> Result(#(Int, BitArray), String)
+fn fetch_tls12(url: String, user_agent: String) -> Result(#(Int, BitArray), Nil)
 
 /// Decode a response body into a string. Valid UTF-8 is kept as-is; pages with
 /// the odd corrupt byte are decoded leniently, replacing only the invalid bytes
