@@ -21,6 +21,10 @@ import logging
 /// Six hours, in milliseconds.
 const interval = 21_600_000
 
+/// Some hosts answer 403 to clients without a browser-like User-Agent.
+const browser_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+  <> "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+
 /// Messages the server understands.
 pub type Message {
   /// Fetch every configured domain and compare it with the last seen content.
@@ -205,16 +209,37 @@ fn fetch_body(url: String) -> Result(String, FetchError) {
   case request.to(url) {
     Error(_) -> Error(BadUrl)
     Ok(request) ->
-      case httpc.send_bits(request.set_body(request, <<>>)) {
-        Ok(response) ->
-          case response.status >= 200 && response.status < 400 {
-            True -> Ok(decode_body(response.body))
-            False -> Error(UnexpectedStatus(response.status))
+      case
+        request
+        |> request.set_header("user-agent", browser_user_agent)
+        |> request.set_body(<<>>)
+        |> httpc.send_bits
+      {
+        Ok(response) -> handle_response(response.status, response.body)
+        // Some hosts sit behind a middlebox that drops Erlang's default
+        // TLS 1.3 handshake, surfacing as `FailedToConnect(_, Posix("closed"))`.
+        // Retry once forcing TLS 1.2; keep the original error if that fails too.
+        Error(error) ->
+          case fetch_tls12(url, browser_user_agent) {
+            Ok(#(status, body)) -> handle_response(status, body)
+            Error(_) -> Error(RequestFailed(error))
           }
-        Error(error) -> Error(RequestFailed(error))
       }
   }
 }
+
+fn handle_response(status: Int, body: BitArray) -> Result(String, FetchError) {
+  case status >= 200 && status < 400 {
+    True -> Ok(decode_body(body))
+    False -> Error(UnexpectedStatus(status))
+  }
+}
+
+@external(erlang, "encoding_ffi", "fetch_tls12")
+fn fetch_tls12(
+  url: String,
+  user_agent: String,
+) -> Result(#(Int, BitArray), String)
 
 /// Decode a response body into a string. Valid UTF-8 is kept as-is; pages with
 /// the odd corrupt byte are decoded leniently, replacing only the invalid bytes
