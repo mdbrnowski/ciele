@@ -1,24 +1,14 @@
-//// Computing a unified diff between two versions of a page and handing it off
-//// to the email layer.
+//// Computing a unified diff between two versions of a page.
 
-import ciele/config.{type Config}
-import ciele/email
 import envoy
 import filepath
 import gleam/erlang/atom.{type Atom}
 import gleam/int
-import logging
 import shellout
 import simplifile
 
-/// Compute the unified diff between `old` and `new`, log it, and send a
-/// notification email for `domain`.
-pub fn handle_diff(
-  old: String,
-  new: String,
-  domain: String,
-  config: Config,
-) -> Nil {
+/// Compute the unified diff between `old` and `new`.
+pub fn compute(old: String, new: String) -> String {
   let #(old_path, new_path) = temp_files()
 
   let _ = simplifile.write(to: old_path, contents: old)
@@ -29,8 +19,7 @@ pub fn handle_diff(
   let _ = simplifile.delete(old_path)
   let _ = simplifile.delete(new_path)
 
-  logging.log(logging.Info, "Diff for " <> domain <> ":\n" <> diff)
-  email.send(diff, domain, config)
+  diff
 }
 
 fn run_diff(old_path: String, new_path: String) -> String {

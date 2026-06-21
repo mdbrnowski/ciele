@@ -4,6 +4,7 @@
 
 import ciele/config.{type Config}
 import ciele/diff
+import ciele/email
 import ciele/url
 import gleam/bit_array
 import gleam/dict.{type Dict}
@@ -144,12 +145,7 @@ fn handle_404(domain: String, state: State, config: Config) -> State {
     1 -> logging.log(logging.Notice, "First 404 for " <> domain)
     2 -> {
       logging.log(logging.Notice, "Two consecutive 404 errors for " <> domain)
-      diff.handle_diff(
-        "[Previous content]\n",
-        "404 Not Found\n",
-        domain,
-        config,
-      )
+      notify_change("[Previous content]\n", "404 Not Found\n", domain, config)
     }
     _ ->
       logging.log(
@@ -181,7 +177,7 @@ fn maybe_log_change(
           <> int.to_string(string.byte_size(body))
           <> " bytes)",
       )
-      diff.handle_diff(old, body, domain, config)
+      notify_change(old, body, domain, config)
     }
     Error(_) ->
       logging.log(
@@ -193,6 +189,19 @@ fn maybe_log_change(
           <> " bytes)",
       )
   }
+}
+
+/// Diff `old` against `new`, log the result, and email a notification for
+/// `domain`.
+fn notify_change(
+  old: String,
+  new: String,
+  domain: String,
+  config: Config,
+) -> Nil {
+  let diff = diff.compute(old, new)
+  logging.log(logging.Info, "Diff for " <> domain <> ":\n" <> diff)
+  email.send(diff, domain, config)
 }
 
 /// Errors that can occur while fetching a page.
