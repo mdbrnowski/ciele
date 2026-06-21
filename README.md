@@ -34,7 +34,9 @@ To run the app, use
 gleam run
 ```
 
-The server checks every configured domain on startup and then every six hours. When a page's `<body>` changes, a unified diff is emailed to you. To run it in the background you can use any process supervisor you like (for example `systemd`, `tmux`, or `nohup gleam run &`).
+The server checks every configured domain on startup and then every six hours.
+Only the `<body>` is compared, with `<script>` tags dropped. When it changes, a unified diff is emailed to you.
+To run it in the background you can use any process supervisor you like (for example `systemd`, `tmux`, or `nohup gleam run &`).
 
 ## Development
 
