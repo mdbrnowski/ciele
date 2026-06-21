@@ -13,9 +13,7 @@ import gleam/http/request
 import gleam/httpc
 import gleam/int
 import gleam/list
-import gleam/option.{Some}
 import gleam/otp/actor
-import gleam/regexp
 import gleam/string
 import logging
 
@@ -260,21 +258,16 @@ pub fn decode_body(body: BitArray) -> String {
 @external(erlang, "ciele_ffi", "lossy_utf8")
 fn lossy_utf8(body: BitArray) -> String
 
-/// Extract the contents of the `<body>` element, falling back to the whole
-/// document when there is no body. This is the part of a page worth comparing.
+/// Reduce a page to the part worth comparing: when `content` is a parseable
+/// HTML document, return its `<body>` with every `<script>` removed,
+/// pretty-printed via Floki. Anything that is not such a document (no body,
+/// unparseable) falls back to comparing the raw content unchanged.
 pub fn comparable_content(content: String) -> String {
-  let assert Ok(re) =
-    regexp.compile(
-      "<body\\b[^>]*>([\\s\\S]*?)</body>",
-      regexp.Options(case_insensitive: True, multi_line: False),
-    )
-
-  case regexp.scan(re, content) {
-    [match, ..] ->
-      case match.submatches {
-        [Some(body), ..] -> body
-        _ -> content
-      }
-    [] -> content
+  case floki_comparable_content(content) {
+    Ok(body) -> body
+    Error(_) -> content
   }
 }
+
+@external(erlang, "Elixir.Ciele.Html", "comparable_content")
+fn floki_comparable_content(content: String) -> Result(String, Nil)
