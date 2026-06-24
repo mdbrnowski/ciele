@@ -1,10 +1,14 @@
 # ciele
 
-An application that monitors selected static websites and notifies you of any changes on them.
+Monitors static websites and emails you when they change.
 
 Written in [Gleam](https://gleam.run), running on the Erlang/OTP runtime.
 
 ## Configuration
+
+> [!NOTE]
+> Setup is a bit involved: you need a Resend API key and a domain you own to send from.
+> This is convenient for me, but if you'd prefer a simpler delivery method, a PR adding one is welcome.
 
 To use the app, you need to set the `RESEND_API_KEY` environment variable. You can obtain the API key from [resend.com](https://resend.com).
 In addition, you need to create a configuration file at `config/config.toml` (see [`config/config.example.toml`](config/config.example.toml)):
