@@ -1,6 +1,6 @@
 import ciele/server
 
-// comparable_content/1
+// comparable_content/2
 
 pub fn comparable_content_extracts_pretty_body_test() {
   let html =

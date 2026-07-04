@@ -18,7 +18,7 @@ domains = [
 ]
 ```
 
-Each `domains` entry is either a bare URL, or a table with a `url` and an optional `ignore` list of [CSS selectors](https://hexdocs.pm/floki/Floki.html#module-selectors)
+Each `domains` entry is either a bare URL, or an inline table with a `url` and an optional `ignore` list of [CSS selectors](https://hexdocs.pm/floki/Floki.html#module-selectors)
 whose matching elements are stripped before comparison.
 This is useful for ignoring volatile regions of a page — ad slots, timestamps, view counters — that would otherwise trigger a diff email on every check:
 
