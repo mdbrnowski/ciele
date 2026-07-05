@@ -9,12 +9,18 @@ import tom.{type Toml}
 
 const config_file = "config/config.toml"
 
+/// A single monitored page: the URL to check, plus any CSS selectors whose
+/// matching elements should be stripped before comparison.
+pub type Page {
+  Page(url: String, ignore: List(String))
+}
+
 /// The application configuration, as read from `config/config.toml`.
 pub type Config {
   Config(
     email_address: String,
     sender_email_address: String,
-    domains: List(String),
+    pages: List(Page),
     /// When `True`, the app does not require `RESEND_API_KEY` and logs the
     /// emails it would send to the console instead of sending them. Optional,
     /// defaults to `False`.
@@ -60,10 +66,10 @@ pub fn load() -> Result(Config, ConfigError) {
     document,
     "sender_email_address",
   ))
-  use domains <- result.try(get_string_list(document, "domains"))
+  use pages <- result.try(get_pages(document, "domains"))
   use dry_run <- result.try(get_bool(document, "dry_run", or: False))
 
-  Ok(Config(email_address:, sender_email_address:, domains:, dry_run:))
+  Ok(Config(email_address:, sender_email_address:, pages:, dry_run:))
 }
 
 fn get_string(
@@ -84,19 +90,48 @@ fn get_bool(
   }
 }
 
-fn get_string_list(
+/// Parse the monitored pages from `key`. Each array element is either a bare
+/// string or an inline table with a `url` and an optional `ignore` list of CSS
+/// selectors.
+fn get_pages(
   document: Dict(String, Toml),
   key: String,
-) -> Result(List(String), ConfigError) {
+) -> Result(List(Page), ConfigError) {
   use nodes <- result.try(
     tom.get_array(document, [key]) |> result.map_error(map_get_error(_, key)),
   )
   list.try_map(nodes, fn(node) {
     case node {
-      tom.String(value) -> Ok(value)
+      tom.String(url) -> Ok(Page(url:, ignore: []))
+      tom.Table(fields) | tom.InlineTable(fields) -> parse_page(fields)
       _ -> Error(InvalidField(key))
     }
   })
+}
+
+fn parse_page(fields: Dict(String, Toml)) -> Result(Page, ConfigError) {
+  use url <- result.try(get_string(fields, "url"))
+  use ignore <- result.try(get_string_list(fields, "ignore", or: []))
+  Ok(Page(url:, ignore:))
+}
+
+fn get_string_list(
+  document: Dict(String, Toml),
+  key: String,
+  or default: List(String),
+) -> Result(List(String), ConfigError) {
+  case tom.get_array(document, [key]) {
+    Error(tom.NotFound(_)) -> Ok(default)
+    result -> {
+      use nodes <- result.try(result |> result.map_error(map_get_error(_, key)))
+      list.try_map(nodes, fn(node) {
+        case node {
+          tom.String(value) -> Ok(value)
+          _ -> Error(InvalidField(key))
+        }
+      })
+    }
+  }
 }
 
 fn map_get_error(error: tom.GetError, key: String) -> ConfigError {

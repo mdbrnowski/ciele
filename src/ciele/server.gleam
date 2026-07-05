@@ -2,7 +2,7 @@
 //// compares it against the previously seen content, and triggers a diff email
 //// when something changes.
 
-import ciele/config.{type Config}
+import ciele/config.{type Config, type Page}
 import ciele/diff
 import ciele/email
 import ciele/url
@@ -77,9 +77,10 @@ fn check_sites(state: State) -> State {
       state
     }
     Ok(config) -> {
+      let urls = list.map(config.pages, fn(page) { page.url })
       let removed =
         dict.keys(state.checks)
-        |> list.filter(fn(domain) { !list.contains(config.domains, domain) })
+        |> list.filter(fn(domain) { !list.contains(urls, domain) })
       list.each(removed, fn(domain) {
         logging.log(logging.Notice, "Domain removed from config: " <> domain)
       })
@@ -87,14 +88,14 @@ fn check_sites(state: State) -> State {
       logging.log(
         logging.Notice,
         "Loaded "
-          <> int.to_string(list.length(config.domains))
+          <> int.to_string(list.length(config.pages))
           <> " domains to check. Starting checks...",
       )
 
       let state = State(..state, checks: dict.drop(state.checks, removed))
       let state =
-        list.fold(config.domains, state, fn(state, domain) {
-          check_and_compare(domain, state, config)
+        list.fold(config.pages, state, fn(state, page) {
+          check_and_compare(page, state, config)
         })
 
       logging.log(
@@ -108,13 +109,14 @@ fn check_sites(state: State) -> State {
   }
 }
 
-fn check_and_compare(domain: String, state: State, config: Config) -> State {
+fn check_and_compare(page: Page, state: State, config: Config) -> State {
+  let domain = page.url
   let url = url.with_scheme(domain)
   logging.log(logging.Info, "Checking domain: " <> url)
 
   case fetch_body(url) {
     Ok(body) -> {
-      let comparable = comparable_content(body)
+      let comparable = comparable_content(body, page.ignore)
       maybe_log_change(domain, comparable, state.checks, config)
       State(
         ..state,
@@ -259,15 +261,19 @@ pub fn decode_body(body: BitArray) -> String {
 fn lossy_utf8(body: BitArray) -> String
 
 /// Reduce a page to the part worth comparing: when `content` is a parseable
-/// HTML document, return its `<body>` with every `<script>` removed,
-/// pretty-printed via Floki. Anything that is not such a document (no body,
-/// unparseable) falls back to comparing the raw content unchanged.
-pub fn comparable_content(content: String) -> String {
-  case floki_comparable_content(content) {
+/// HTML document, return its `<body>` with every `<script>` and every element
+/// matching one of the `ignore` CSS selectors removed, pretty-printed via
+/// Floki. Anything that is not such a document (no body, unparseable) falls back
+/// to comparing the raw content unchanged, in which case `ignore` has no effect.
+pub fn comparable_content(content: String, ignore: List(String)) -> String {
+  case floki_comparable_content(content, ignore) {
     Ok(body) -> body
     Error(_) -> content
   }
 }
 
 @external(erlang, "Elixir.Ciele.Html", "comparable_content")
-fn floki_comparable_content(content: String) -> Result(String, Nil)
+fn floki_comparable_content(
+  content: String,
+  ignore: List(String),
+) -> Result(String, Nil)

@@ -22,6 +22,17 @@ domains = [
 ]
 ```
 
+Each `domains` entry is either a bare URL, or an inline table with a `url` and an optional `ignore` list of [CSS selectors](https://hexdocs.pm/floki/Floki.html#module-selectors)
+whose matching elements are stripped before comparison.
+This is useful for ignoring volatile regions of a page — ad slots, timestamps, view counters — that would otherwise trigger a diff email on every check:
+
+```toml
+domains = [
+  "www.gleam.run",
+  { url = "www.erlang.org", ignore = ["div.community", "span.timestamp"] },
+]
+```
+
 ### Dry-run mode
 
 Set `dry_run = true` in the config file to try the app without sending real emails. In this mode `RESEND_API_KEY` is not required, and instead of sending emails the app logs to the console the messages it would have sent.
@@ -39,7 +50,7 @@ gleam run
 ```
 
 The server checks every configured domain on startup and then every six hours.
-Only the `<body>` is compared, with `<script>` tags dropped. When it changes, a unified diff is emailed to you.
+Only the `<body>` is compared, with `<script>` tags and any configured `ignore` selectors dropped. When it changes, a unified diff is emailed to you.
 To run it in the background you can use any process supervisor you like (for example `systemd`, `tmux`, or `nohup gleam run &`).
 
 ## Development
