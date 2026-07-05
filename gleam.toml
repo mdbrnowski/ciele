@@ -1,5 +1,5 @@
 name = "ciele"
-version = "0.1.0"
+version = "1.0.0"
 description = "An application that monitors selected static websites and notifies you of any changes on them."
 licences = ["MIT"]
 gleam = ">= 1.17.0"
