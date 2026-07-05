@@ -59,6 +59,13 @@ pub fn comparable_content_removes_pseudo_classes_test() {
     == "<body>\n  <p>\n    keep\n  </p>\n</body>\n"
 }
 
+pub fn comparable_content_skips_invalid_selectors_test() {
+  let html =
+    "<html><body><p>keep</p><script>x</script><bold>ciao</bold></body></html>"
+  assert server.comparable_content(html, ["p:unreal-state", "bold"])
+    == "<body>\n  <p>\n    keep\n  </p>\n</body>\n"
+}
+
 // decode_body/1
 
 pub fn decode_body_keeps_valid_utf8_test() {
