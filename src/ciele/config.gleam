@@ -9,10 +9,11 @@ import tom.{type Toml}
 
 const config_file = "config/config.toml"
 
-/// A single monitored page: the URL to check, plus any CSS selectors whose
-/// matching elements should be stripped before comparison.
+/// A single monitored page: the URL to check, the CSS selectors whose matching
+/// elements are stripped before comparison (`ignore`), and whether to strip
+/// `class` attributes from every remaining tag (`ignore_classes`).
 pub type Page {
-  Page(url: String, ignore: List(String))
+  Page(url: String, ignore: List(String), ignore_classes: Bool)
 }
 
 /// The application configuration, as read from `config/config.toml`.
@@ -91,8 +92,8 @@ fn get_bool(
 }
 
 /// Parse the monitored pages from `key`. Each array element is either a bare
-/// string or an inline table with a `url` and an optional `ignore` list of CSS
-/// selectors.
+/// string or an inline table with a `url` and optional `ignore` and
+/// `ignore_classes`.
 fn get_pages(
   document: Dict(String, Toml),
   key: String,
@@ -102,7 +103,7 @@ fn get_pages(
   )
   list.try_map(nodes, fn(node) {
     case node {
-      tom.String(url) -> Ok(Page(url:, ignore: []))
+      tom.String(url) -> Ok(Page(url:, ignore: [], ignore_classes: False))
       tom.Table(fields) | tom.InlineTable(fields) -> parse_page(fields)
       _ -> Error(InvalidField(key))
     }
@@ -112,7 +113,8 @@ fn get_pages(
 fn parse_page(fields: Dict(String, Toml)) -> Result(Page, ConfigError) {
   use url <- result.try(get_string(fields, "url"))
   use ignore <- result.try(get_string_list(fields, "ignore", or: []))
-  Ok(Page(url:, ignore:))
+  use ignore_classes <- result.try(get_bool(fields, "ignore_classes", or: False))
+  Ok(Page(url:, ignore:, ignore_classes:))
 }
 
 fn get_string_list(
