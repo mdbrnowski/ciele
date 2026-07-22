@@ -3,4 +3,5 @@ sender_email_address = "ciele@yourdomain.com"
 domains = [
   "gleam.run",
   { url = "erlang.org", ignore = ["div.community", "span.timestamp"] },
+  { url = "elixir-lang.org", ignore_classes = true },
 ]

@@ -116,7 +116,8 @@ fn check_and_compare(page: Page, state: State, config: Config) -> State {
 
   case fetch_body(url) {
     Ok(body) -> {
-      let comparable = comparable_content(body, page.ignore)
+      let comparable =
+        comparable_content(body, page.ignore, page.ignore_classes)
       maybe_log_change(domain, comparable, state.checks, config)
       State(
         ..state,
@@ -263,10 +264,14 @@ fn lossy_utf8(body: BitArray) -> String
 /// Reduce a page to the part worth comparing: when `content` is a parseable
 /// HTML document, return its `<body>` with every `<script>` and every element
 /// matching one of the `ignore` CSS selectors removed, pretty-printed via
-/// Floki. Anything that is not such a document (no body, unparseable) falls back
-/// to comparing the raw content unchanged, in which case `ignore` has no effect.
-pub fn comparable_content(content: String, ignore: List(String)) -> String {
-  case floki_comparable_content(content, ignore) {
+/// Floki. When `ignore_classes` is `True`, `class` attributes are stripped from
+/// every remaining tag too.
+pub fn comparable_content(
+  content: String,
+  ignore: List(String),
+  ignore_classes: Bool,
+) -> String {
+  case floki_comparable_content(content, ignore, ignore_classes) {
     Ok(body) -> body
     Error(_) -> content
   }
@@ -276,4 +281,5 @@ pub fn comparable_content(content: String, ignore: List(String)) -> String {
 fn floki_comparable_content(
   content: String,
   ignore: List(String),
+  ignore_classes: Bool,
 ) -> Result(String, Nil)
