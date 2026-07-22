@@ -9,8 +9,9 @@ import tom.{type Toml}
 
 const config_file = "config/config.toml"
 
-/// A single monitored page: the URL to check, plus any CSS selectors whose
-/// matching elements should be stripped before comparison.
+/// A single monitored page: the URL to check, the CSS selectors whose matching
+/// elements are stripped before comparison (`ignore`), and whether to strip
+/// `class` attributes from every remaining tag (`ignore_classes`).
 pub type Page {
   Page(url: String, ignore: List(String), ignore_classes: Bool)
 }
