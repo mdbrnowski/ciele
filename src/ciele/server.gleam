@@ -33,7 +33,7 @@ pub type Message {
 type State {
   State(
     self: Subject(Message),
-    /// The last seen comparable content for each domain.
+    /// The last seen raw body for each domain.
     checks: Dict(String, String),
     /// Consecutive 404 counts per domain.
     errors: Dict(String, Int),
@@ -116,12 +116,10 @@ fn check_and_compare(page: Page, state: State, config: Config) -> State {
 
   case fetch_body(url) {
     Ok(body) -> {
-      let comparable =
-        comparable_content(body, page.ignore, page.ignore_classes)
-      maybe_log_change(domain, comparable, state.checks, config)
+      maybe_log_change(page, body, state.checks, config)
       State(
         ..state,
-        checks: dict.insert(state.checks, domain, comparable),
+        checks: dict.insert(state.checks, domain, body),
         errors: dict.delete(state.errors, domain),
       )
     }
@@ -158,27 +156,36 @@ fn handle_404(domain: String, state: State, config: Config) -> State {
   State(..state, errors: dict.insert(state.errors, domain, count))
 }
 
+/// Compare the freshly fetched `body` for `page` against the last seen raw body
+/// in `checks`.
 fn maybe_log_change(
-  domain: String,
+  page: Page,
   body: String,
   checks: Dict(String, String),
   config: Config,
 ) -> Nil {
+  let domain = page.url
+  let new = comparable_content(body, page.ignore, page.ignore_classes)
+
   case dict.get(checks, domain) {
-    Ok(old) if old == body ->
-      logging.log(logging.Info, "No change for " <> domain)
-    Ok(old) -> {
-      logging.log(
-        logging.Notice,
-        "Content changed for "
-          <> domain
-          <> " ("
-          <> int.to_string(string.byte_size(old))
-          <> " -> "
-          <> int.to_string(string.byte_size(body))
-          <> " bytes)",
-      )
-      notify_change(old, body, domain, config)
+    Ok(previous) -> {
+      let old = comparable_content(previous, page.ignore, page.ignore_classes)
+      case old == new {
+        True -> logging.log(logging.Info, "No change for " <> domain)
+        False -> {
+          logging.log(
+            logging.Notice,
+            "Content changed for "
+              <> domain
+              <> " ("
+              <> int.to_string(string.byte_size(old))
+              <> " -> "
+              <> int.to_string(string.byte_size(new))
+              <> " bytes)",
+          )
+          notify_change(old, new, domain, config)
+        }
+      }
     }
     Error(_) ->
       logging.log(
@@ -186,7 +193,7 @@ fn maybe_log_change(
         "First check recorded for "
           <> domain
           <> " ("
-          <> int.to_string(string.byte_size(body))
+          <> int.to_string(string.byte_size(new))
           <> " bytes)",
       )
   }
