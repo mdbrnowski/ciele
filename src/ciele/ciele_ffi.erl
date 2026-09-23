@@ -1,5 +1,6 @@
 -module(ciele_ffi).
--export([lossy_utf8/1, fetch_tls12/2, configure_timestamps/0, format/2]).
+-export([lossy_utf8/1, fetch_tls12/2, configure_timestamps/0, format/2,
+         write_sync/2]).
 
 %% Fetch `Url' over HTTPS forcing a TLS 1.2 handshake.
 fetch_tls12(Url, UserAgent) ->
@@ -62,3 +63,24 @@ format(#{meta := Meta} = Event, Config) ->
         [Y, Mo, D, H, Mi, S]
     ),
     [Timestamp, $\s, logging_ffi:format(Event, Config)].
+
+%% Write `Contents' to `Path', flushed to disk, so the rename in
+%% `ciele@store:save/1' cannot be committed ahead of the data.
+write_sync(Path, Contents) ->
+    case file:open(Path, [write, raw, binary]) of
+        {ok, Fd} ->
+            Result = case file:write(Fd, Contents) of
+                         ok -> file:sync(Fd);
+                         WriteError -> WriteError
+                     end,
+            _ = file:close(Fd),
+            case Result of
+                ok -> {ok, nil};
+                {error, Reason} -> {error, describe_file_error(Reason)}
+            end;
+        {error, Reason} ->
+            {error, describe_file_error(Reason)}
+    end.
+
+describe_file_error(Reason) ->
+    unicode:characters_to_binary(file:format_error(Reason)).

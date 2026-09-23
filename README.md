@@ -50,7 +50,9 @@ gleam run
 ```
 
 The server checks every configured domain on startup and then every six hours.
-Only the `<body>` is compared, with `<script>` tags and any configured `ignore` selectors dropped. When it changes, a unified diff is emailed to you.
+Only the `<body>` is compared, with `<script>` tags and any configured `ignore` selectors dropped.
+When it changes, a unified diff is emailed to you.
+The last seen content of each page is saved to `data/state.json`, so changes made while the app was down are still reported after a restart.
 To run it in the background you can use any process supervisor you like (for example `systemd`, `tmux`, or `nohup gleam run &`).
 
 ## Development

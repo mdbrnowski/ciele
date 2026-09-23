@@ -5,6 +5,7 @@
 import ciele/config.{type Config, type Page}
 import ciele/diff
 import ciele/email
+import ciele/store.{type Snapshot, Snapshot}
 import ciele/url
 import gleam/bit_array
 import gleam/dict.{type Dict}
@@ -13,12 +14,17 @@ import gleam/http/request
 import gleam/httpc
 import gleam/int
 import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/otp/actor
 import gleam/string
+import gleam/time/timestamp.{type Timestamp}
 import logging
 
 /// Six hours, in milliseconds.
 const interval = 21_600_000
+
+/// How long the initialiser has to read the state file, in milliseconds.
+const init_timeout = 10_000
 
 /// Some hosts answer 403 to clients without a browser-like User-Agent.
 const browser_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -33,24 +39,62 @@ pub type Message {
 type State {
   State(
     self: Subject(Message),
-    /// The last seen raw body for each domain.
-    checks: Dict(String, String),
-    /// Consecutive 404 counts per domain.
-    errors: Dict(String, Int),
+    /// The last seen snapshot for each domain, keyed by its configured URL.
+    pages: Dict(String, Snapshot),
   )
 }
 
-/// Start the server. The first check is scheduled to run immediately.
+/// Start the server, restoring the previous run's snapshots. The first check
+/// is scheduled to run immediately.
 pub fn start() -> Result(actor.Started(Subject(Message)), actor.StartError) {
-  actor.new_with_initialiser(1000, fn(self) {
+  actor.new_with_initialiser(init_timeout, fn(self) {
     process.send(self, CheckSites)
-    State(self:, checks: dict.new(), errors: dict.new())
+    State(self:, pages: restore())
     |> actor.initialised
     |> actor.returning(self)
     |> Ok
   })
   |> actor.on_message(handle_message)
   |> actor.start
+}
+
+/// Read the persisted snapshots, falling back to an empty set.
+fn restore() -> Dict(String, Snapshot) {
+  case store.load() {
+    Ok(pages) -> {
+      logging.log(
+        logging.Notice,
+        "Restored "
+          <> int.to_string(dict.size(pages))
+          <> " snapshots from "
+          <> store.path()
+          <> since(last_fetch(pages)),
+      )
+      pages
+    }
+    Error(error) -> {
+      logging.log(
+        logging.Warning,
+        "Starting without previous snapshots: " <> store.describe_error(error),
+      )
+      dict.new()
+    }
+  }
+}
+
+/// Write the snapshots to disk. A failure is logged and retried next cycle.
+fn persist(pages: Dict(String, Snapshot)) -> Nil {
+  case store.save(pages) {
+    Ok(Nil) ->
+      logging.log(
+        logging.Info,
+        "Saved "
+          <> int.to_string(dict.size(pages))
+          <> " snapshots to "
+          <> store.path(),
+      )
+    Error(error) -> logging.log(logging.Error, store.describe_error(error))
+  }
 }
 
 fn handle_message(
@@ -79,7 +123,7 @@ fn check_sites(state: State) -> State {
     Ok(config) -> {
       let urls = list.map(config.pages, fn(page) { page.url })
       let removed =
-        dict.keys(state.checks)
+        dict.keys(state.pages)
         |> list.filter(fn(domain) { !list.contains(urls, domain) })
       list.each(removed, fn(domain) {
         logging.log(logging.Notice, "Domain removed from config: " <> domain)
@@ -92,11 +136,13 @@ fn check_sites(state: State) -> State {
           <> " domains to check. Starting checks...",
       )
 
-      let state = State(..state, checks: dict.drop(state.checks, removed))
+      let state = State(..state, pages: dict.drop(state.pages, removed))
       let state =
         list.fold(config.pages, state, fn(state, page) {
           check_and_compare(page, state, config)
         })
+
+      persist(state.pages)
 
       logging.log(
         logging.Notice,
@@ -116,11 +162,18 @@ fn check_and_compare(page: Page, state: State, config: Config) -> State {
 
   case fetch_body(url) {
     Ok(body) -> {
-      maybe_log_change(page, body, state.checks, config)
+      maybe_log_change(page, body, state.pages, config)
       State(
         ..state,
-        checks: dict.insert(state.checks, domain, body),
-        errors: dict.delete(state.errors, domain),
+        pages: dict.insert(
+          state.pages,
+          domain,
+          Snapshot(
+            body: Some(body),
+            fetched_at: Some(timestamp.system_time()),
+            errors: 0,
+          ),
+        ),
       )
     }
     Error(UnexpectedStatus(404)) -> handle_404(domain, state, config)
@@ -135,10 +188,12 @@ fn check_and_compare(page: Page, state: State, config: Config) -> State {
 }
 
 fn handle_404(domain: String, state: State, config: Config) -> State {
-  let count = case dict.get(state.errors, domain) {
-    Ok(previous) -> previous + 1
-    Error(_) -> 1
+  // Keep the last body we saw: the page may come back.
+  let snapshot = case dict.get(state.pages, domain) {
+    Ok(snapshot) -> snapshot
+    Error(_) -> Snapshot(body: None, fetched_at: None, errors: 0)
   }
+  let count = snapshot.errors + 1
 
   case count {
     1 -> logging.log(logging.Notice, "First 404 for " <> domain)
@@ -153,22 +208,25 @@ fn handle_404(domain: String, state: State, config: Config) -> State {
       )
   }
 
-  State(..state, errors: dict.insert(state.errors, domain, count))
+  State(
+    ..state,
+    pages: dict.insert(state.pages, domain, Snapshot(..snapshot, errors: count)),
+  )
 }
 
-/// Compare the freshly fetched `body` for `page` against the last seen raw body
-/// in `checks`.
+/// Compare the freshly fetched `body` for `page` against the raw body of its
+/// last snapshot.
 fn maybe_log_change(
   page: Page,
   body: String,
-  checks: Dict(String, String),
+  pages: Dict(String, Snapshot),
   config: Config,
 ) -> Nil {
   let domain = page.url
   let new = comparable_content(body, page.ignore, page.ignore_classes)
 
-  case dict.get(checks, domain) {
-    Ok(previous) -> {
+  case dict.get(pages, domain) {
+    Ok(Snapshot(body: Some(previous), fetched_at:, ..)) -> {
       let old = comparable_content(previous, page.ignore, page.ignore_classes)
       case old == new {
         True -> logging.log(logging.Info, "No change for " <> domain)
@@ -177,6 +235,7 @@ fn maybe_log_change(
             logging.Notice,
             "Content changed for "
               <> domain
+              <> since(fetched_at)
               <> " ("
               <> int.to_string(string.byte_size(old))
               <> " -> "
@@ -187,7 +246,7 @@ fn maybe_log_change(
         }
       }
     }
-    Error(_) ->
+    _ ->
       logging.log(
         logging.Notice,
         "First check recorded for "
@@ -197,6 +256,26 @@ fn maybe_log_change(
           <> " bytes)",
       )
   }
+}
+
+/// Render the age of a snapshot, for example " (last seen 3 days ago)".
+fn since(fetched_at: Option(Timestamp)) -> String {
+  case fetched_at {
+    None -> ""
+    Some(moment) ->
+      " (last seen "
+      <> store.describe_age(moment, timestamp.system_time())
+      <> ")"
+  }
+}
+
+/// The most recent fetch among `pages`, or `None` when nothing was restored:
+/// how stale the state read back from disk is.
+fn last_fetch(pages: Dict(String, Snapshot)) -> Option(Timestamp) {
+  dict.values(pages)
+  |> list.filter_map(fn(snapshot) { option.to_result(snapshot.fetched_at, Nil) })
+  |> list.max(timestamp.compare)
+  |> option.from_result
 }
 
 /// Diff `old` against `new`, log the result, and email a notification for
