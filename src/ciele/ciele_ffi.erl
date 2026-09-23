@@ -1,6 +1,6 @@
 -module(ciele_ffi).
 -export([lossy_utf8/1, fetch_tls12/2, configure_timestamps/0, format/2,
-         write_sync/2]).
+         write_sync/2, sync_directory/1]).
 
 %% Fetch `Url' over HTTPS forcing a TLS 1.2 handshake.
 fetch_tls12(Url, UserAgent) ->
@@ -81,6 +81,11 @@ write_sync(Path, Contents) ->
         {error, Reason} ->
             {error, describe_file_error(Reason)}
     end.
+
+%% Flush `Dir' itself, so a rename inside it survives a power cut.
+sync_directory(Dir) ->
+    _ = os:cmd("sync " ++ binary_to_list(Dir)),
+    nil.
 
 describe_file_error(Reason) ->
     unicode:characters_to_binary(file:format_error(Reason)).

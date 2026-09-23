@@ -81,7 +81,8 @@ pub fn load() -> Result(Dict(String, Snapshot), StoreError) {
   }
 }
 
-/// Persist `snapshots` atomically: write to a temporary file, flush, rename.
+/// Persist `snapshots` atomically: write to a temporary file, flush, rename,
+/// flush the directory.
 pub fn save(snapshots: Dict(String, Snapshot)) -> Result(Nil, StoreError) {
   let written = {
     use _ <- result.try(
@@ -91,8 +92,11 @@ pub fn save(snapshots: Dict(String, Snapshot)) -> Result(Nil, StoreError) {
     use _ <- result.try(
       write_sync(temp_file, encode(snapshots)) |> result.map_error(WriteError),
     )
-    simplifile.rename(at: temp_file, to: state_file)
-    |> result.map_error(describe_write_error)
+    use _ <- result.try(
+      simplifile.rename(at: temp_file, to: state_file)
+      |> result.map_error(describe_write_error),
+    )
+    Ok(sync_directory(directory))
   }
 
   case written {
@@ -113,6 +117,9 @@ fn describe_write_error(error: simplifile.FileError) -> StoreError {
 /// be committed ahead of the data.
 @external(erlang, "ciele_ffi", "write_sync")
 fn write_sync(path: String, contents: String) -> Result(Nil, String)
+
+@external(erlang, "ciele_ffi", "sync_directory")
+fn sync_directory(path: String) -> Nil
 
 /// Encode `snapshots` as the JSON document kept on disk.
 pub fn encode(snapshots: Dict(String, Snapshot)) -> String {

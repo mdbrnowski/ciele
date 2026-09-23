@@ -1,7 +1,9 @@
 import ciele/store.{Snapshot}
 import gleam/dict
+import gleam/dynamic.{type Dynamic}
 import gleam/option.{None, Some}
 import gleam/time/timestamp.{type Timestamp}
+import simplifile
 
 // encode/1 and parse/1
 
@@ -72,6 +74,36 @@ pub fn parse_ignores_an_unreadable_timestamp_test() {
     == Ok(dict.from_list([#("gleam.run", expected)]))
 }
 
+// save/1 and load/0
+
+pub fn load_without_a_file_is_empty_test() {
+  assert in_scratch_directory(store.load) == Ok(dict.new())
+}
+
+pub fn save_then_load_round_trips_test() {
+  let pages =
+    dict.from_list([
+      #("gleam.run", Snapshot(body: Some("hi"), fetched_at: None, errors: 2)),
+    ])
+  let loaded =
+    in_scratch_directory(fn() {
+      let _ = store.save(pages)
+      store.load()
+    })
+  assert loaded == Ok(pages)
+}
+
+pub fn failed_save_removes_the_temp_file_test() {
+  let #(saved, temp_file) =
+    in_scratch_directory(fn() {
+      // A directory in the way makes the final rename fail.
+      let _ = simplifile.create_directory_all("data/state.json")
+      #(store.save(dict.new()), simplifile.is_file("data/state.json.tmp"))
+    })
+  assert saved != Ok(Nil)
+  assert temp_file == Ok(False)
+}
+
 // describe_age/2
 
 pub fn describe_age_in_days_test() {
@@ -101,6 +133,23 @@ pub fn describe_age_of_a_fresh_snapshot_test() {
 pub fn describe_age_of_a_snapshot_from_the_future_test() {
   assert store.describe_age(at(500), at(100)) == "just now"
 }
+
+/// Run `body` from an empty directory, so it never touches the real state
+/// file.
+fn in_scratch_directory(body: fn() -> a) -> a {
+  let assert Ok(root) = simplifile.current_directory()
+  let scratch = root <> "/build/store_test"
+  let _ = simplifile.delete(scratch)
+  let assert Ok(Nil) = simplifile.create_directory_all(scratch)
+  set_cwd(scratch)
+  let result = body()
+  set_cwd(root)
+  let _ = simplifile.delete(scratch)
+  result
+}
+
+@external(erlang, "file", "set_cwd")
+fn set_cwd(directory: String) -> Dynamic
 
 fn at(seconds: Int) -> Timestamp {
   timestamp.from_unix_seconds(seconds)
