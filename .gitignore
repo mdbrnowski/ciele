@@ -1,4 +1,5 @@
 config/config.toml
+data/
 
 # Gleam
 /build
