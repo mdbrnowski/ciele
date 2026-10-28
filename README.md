@@ -33,6 +33,16 @@ domains = [
 ]
 ```
 
+A table can also take an `ignore_attributes` list of [HTML attributes](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes): the `name="value"` pairs inside a tag, like `class` and `id` in `<div class="card-x7f2" id="post-81">`.
+The listed attributes are removed from every tag before comparison.
+Some sites regenerate class names or ids on every build even when the visible text stays the same, and this keeps them from triggering a diff email:
+
+```toml
+domains = [
+  { url = "www.gleam.run", ignore_attributes = ["class", "id"] },
+]
+```
+
 ### Dry-run mode
 
 Set `dry_run = true` in the config file to try the app without sending real emails. In this mode `RESEND_API_KEY` is not required, and instead of sending emails the app logs to the console the messages it would have sent.

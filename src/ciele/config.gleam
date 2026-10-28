@@ -10,10 +10,10 @@ import tom.{type Toml}
 const config_file = "config/config.toml"
 
 /// A single monitored page: the URL to check, the CSS selectors whose matching
-/// elements are stripped before comparison (`ignore`), and whether to strip
-/// `class` attributes from every remaining tag (`ignore_classes`).
+/// elements are stripped before comparison (`ignore`), and the attributes
+/// stripped from every remaining tag (`ignore_attributes`).
 pub type Page {
-  Page(url: String, ignore: List(String), ignore_classes: Bool)
+  Page(url: String, ignore: List(String), ignore_attributes: List(String))
 }
 
 /// The application configuration, as read from `config/config.toml`.
@@ -26,6 +26,9 @@ pub type Config {
     /// emails it would send to the console instead of sending them. Optional,
     /// defaults to `False`.
     dry_run: Bool,
+    /// Notices about deprecated options that are still honoured but should be
+    /// migrated.
+    warnings: List(String),
   )
 }
 
@@ -60,6 +63,11 @@ pub fn load() -> Result(Config, ConfigError) {
   use source <- result.try(
     simplifile.read(config_file) |> result.map_error(ReadError),
   )
+  parse(source)
+}
+
+/// Parse and validate the contents of a config file.
+pub fn parse(source: String) -> Result(Config, ConfigError) {
   use document <- result.try(tom.parse(source) |> result.map_error(ParseError))
 
   use email_address <- result.try(get_string(document, "email_address"))
@@ -67,10 +75,10 @@ pub fn load() -> Result(Config, ConfigError) {
     document,
     "sender_email_address",
   ))
-  use pages <- result.try(get_pages(document, "domains"))
+  use #(pages, warnings) <- result.try(get_pages(document, "domains"))
   use dry_run <- result.try(get_bool(document, "dry_run", or: False))
 
-  Ok(Config(email_address:, sender_email_address:, pages:, dry_run:))
+  Ok(Config(email_address:, sender_email_address:, pages:, dry_run:, warnings:))
 }
 
 fn get_string(
@@ -91,30 +99,55 @@ fn get_bool(
   }
 }
 
-/// Parse the monitored pages from `key`. Each array element is either a bare
-/// string or an inline table with a `url` and optional `ignore` and
-/// `ignore_classes`.
+/// Parse the monitored pages from `key`, along with any deprecation warnings.
+/// Each array element is either a bare string or an inline table with a `url`
+/// and optional `ignore` and `ignore_attributes`.
 fn get_pages(
   document: Dict(String, Toml),
   key: String,
-) -> Result(List(Page), ConfigError) {
+) -> Result(#(List(Page), List(String)), ConfigError) {
   use nodes <- result.try(
     tom.get_array(document, [key]) |> result.map_error(map_get_error(_, key)),
   )
-  list.try_map(nodes, fn(node) {
-    case node {
-      tom.String(url) -> Ok(Page(url:, ignore: [], ignore_classes: False))
-      tom.Table(fields) | tom.InlineTable(fields) -> parse_page(fields)
-      _ -> Error(InvalidField(key))
-    }
-  })
+  use parsed <- result.try(
+    list.try_map(nodes, fn(node) {
+      case node {
+        tom.String(url) ->
+          Ok(#(Page(url:, ignore: [], ignore_attributes: []), []))
+        tom.Table(fields) | tom.InlineTable(fields) -> parse_page(fields)
+        _ -> Error(InvalidField(key))
+      }
+    }),
+  )
+  let #(pages, warnings) = list.unzip(parsed)
+  Ok(#(pages, list.flatten(warnings)))
 }
 
-fn parse_page(fields: Dict(String, Toml)) -> Result(Page, ConfigError) {
+fn parse_page(
+  fields: Dict(String, Toml),
+) -> Result(#(Page, List(String)), ConfigError) {
   use url <- result.try(get_string(fields, "url"))
   use ignore <- result.try(get_string_list(fields, "ignore", or: []))
+  use ignore_attributes <- result.try(
+    get_string_list(fields, "ignore_attributes", or: []),
+  )
+
+  // Deprecated: `ignore_classes = true` is shorthand for ignoring `class`.
   use ignore_classes <- result.try(get_bool(fields, "ignore_classes", or: False))
-  Ok(Page(url:, ignore:, ignore_classes:))
+  let ignore_attributes = case ignore_classes {
+    True -> ["class", ..ignore_attributes]
+    False -> ignore_attributes
+  }
+  let warnings = case dict.has_key(fields, "ignore_classes") {
+    True -> [
+      "'ignore_classes' (for "
+      <> url
+      <> ") is deprecated, use 'ignore_attributes' instead",
+    ]
+    False -> []
+  }
+
+  Ok(#(Page(url:, ignore:, ignore_attributes:), warnings))
 }
 
 fn get_string_list(
