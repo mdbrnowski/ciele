@@ -121,6 +121,8 @@ fn check_sites(state: State) -> State {
       state
     }
     Ok(config) -> {
+      list.each(config.warnings, logging.log(logging.Warning, _))
+
       let urls = list.map(config.pages, fn(page) { page.url })
       let removed =
         dict.keys(state.pages)
@@ -223,11 +225,12 @@ fn maybe_log_change(
   config: Config,
 ) -> Nil {
   let domain = page.url
-  let new = comparable_content(body, page.ignore, page.ignore_classes)
+  let new = comparable_content(body, page.ignore, page.ignore_attributes)
 
   case dict.get(pages, domain) {
     Ok(Snapshot(body: Some(previous), fetched_at:, ..)) -> {
-      let old = comparable_content(previous, page.ignore, page.ignore_classes)
+      let old =
+        comparable_content(previous, page.ignore, page.ignore_attributes)
       case old == new {
         True -> logging.log(logging.Info, "No change for " <> domain)
         False -> {
@@ -350,14 +353,14 @@ fn lossy_utf8(body: BitArray) -> String
 /// Reduce a page to the part worth comparing: when `content` is a parseable
 /// HTML document, return its `<body>` with every `<script>` and every element
 /// matching one of the `ignore` CSS selectors removed, pretty-printed via
-/// Floki. When `ignore_classes` is `True`, `class` attributes are stripped from
-/// every remaining tag too.
+/// Floki. Every attribute named in `ignore_attributes` is stripped from the
+/// remaining tags too.
 pub fn comparable_content(
   content: String,
   ignore: List(String),
-  ignore_classes: Bool,
+  ignore_attributes: List(String),
 ) -> String {
-  case floki_comparable_content(content, ignore, ignore_classes) {
+  case floki_comparable_content(content, ignore, ignore_attributes) {
     Ok(body) -> body
     Error(_) -> content
   }
@@ -367,5 +370,5 @@ pub fn comparable_content(
 fn floki_comparable_content(
   content: String,
   ignore: List(String),
-  ignore_classes: Bool,
+  ignore_attributes: List(String),
 ) -> Result(String, Nil)
